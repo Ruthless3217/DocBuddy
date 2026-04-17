@@ -48,9 +48,16 @@ export default function Register() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await authService.register({ ...formData, role });
+      const { user } = await authService.register({ ...formData, role });
       toast.success('Welcome to DocBuddy AI!');
-      navigate('/dashboard');
+      
+      const roleDashboard = {
+        admin: '/admin/dashboard',
+        doctor: '/doctor/dashboard',
+        patient: '/dashboard'
+      };
+      
+      navigate(roleDashboard[user.role] || '/');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {

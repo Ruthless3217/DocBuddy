@@ -76,11 +76,25 @@ exports.chatWithAi = async (patientId, sessionId, content) => {
     // 4. Parse JSON Response
     try {
       // Find JSON block if LLM adds markdown or fluff
-      const jsonStr = aiMessageContent.match(/\{[\s\S]*\}/)[0];
+      // First try to match between ```json and ```
+      let jsonStr = aiMessageContent.match(/```json\s*([\s\S]*?)\s*```/)?.[1];
+      
+      // If that fails, find the first '{' and last '}'
+      if (!jsonStr) {
+        const match = aiMessageContent.match(/\{[\s\S]*\}/);
+        jsonStr = match ? match[0] : null;
+      }
+
+      if (!jsonStr) throw new Error('No JSON found in AI response');
+      
       structured = JSON.parse(jsonStr);
     } catch (e) {
       logger.error('AI Failed to provide structured JSON:', aiMessageContent);
-      structured = { summary: aiMessageContent, urgencyLevel: 'unknown' };
+      structured = { 
+        summary: aiMessageContent.replace(/\{[\s\S]*\}/g, '').trim(), 
+        urgencyLevel: 'unknown',
+        disclaimer: "This is not medical advice. Consult a doctor for diagnosis."
+      };
     }
 
     // 5. Save to Conversation
@@ -128,19 +142,76 @@ async function callGeminiAPI(history) {
 }
 
 /**
- * Custom LLM Shim (compatible with OpenAI-like API)
+ * Helper to format prompt for fine-tuned models
+ */
+function formatPromptByModel(messages) {
+  const modelName = CUSTOM_LLM_MODEL.toLowerCase();
+
+  // Llama-3 Format
+  if (modelName.includes('llama-3') || modelName.includes('llama3')) {
+    let prompt = "<|begin_of_text|>";
+    messages.forEach(msg => {
+      prompt += `<|start_header_id|>${msg.role}<|end_header_id|>\n\n${msg.content}<|eot_id|>`;
+    });
+    prompt += `<|start_header_id|>assistant<|end_header_id|>\n\n`;
+    return prompt;
+  }
+
+  // Mistral / Llama-2 [INST] format
+  if (modelName.includes('mistral') || modelName.includes('llama-2')) {
+    let prompt = "";
+    messages.forEach(msg => {
+      if (msg.role === 'system') prompt += `[INST] <<SYS>>\n${msg.content}\n<</SYS>>\n\n`;
+      else if (msg.role === 'user') prompt += `${msg.content} [/INST] `;
+      else prompt += `${msg.content} [INST] `;
+    });
+    return prompt;
+  }
+
+  // Default: Return as-is for OpenAI-compatible ChatCompletions APIs
+  return messages;
+}
+
+/**
+ * Custom LLM Shim (compatible with OpenAI-like API or RAW prompt)
  */
 async function callCustomLLM(history) {
-  const response = await axios.post(
-    CUSTOM_LLM_URL,
-    {
-      model: CUSTOM_LLM_MODEL,
-      messages: history,
-      temperature: 0.2,
-      response_format: { type: "json_object" }
-    },
-    { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
-  );
+  try {
+    const formattedInput = formatPromptByModel(history);
+    const isRawPrompt = typeof formattedInput === 'string';
 
-  return response.data.choices[0].message.content;
+    const payload = isRawPrompt 
+      ? { model: CUSTOM_LLM_MODEL, prompt: formattedInput, stop: ["<|eot_id|>", "[/INST]"], temperature: 0.1 }
+      : { model: CUSTOM_LLM_MODEL, messages: history, temperature: 0.1, response_format: { type: "json_object" } };
+
+    const endpoint = isRawPrompt 
+      ? CUSTOM_LLM_URL.replace('/chat/completions', '/completions') 
+      : CUSTOM_LLM_URL;
+
+    logger.debug(`Calling Custom LLM at: ${endpoint}`);
+
+    const response = await axios.post(
+      endpoint,
+      payload,
+      { 
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY || 'no-key'}` 
+        },
+        timeout: 60000 // 60s timeout for local inference
+      }
+    );
+
+    const result = isRawPrompt 
+      ? response.data.choices[0].text 
+      : response.data.choices[0].message.content;
+
+    return result;
+  } catch (error) {
+    logger.error('Custom LLM Call Failed:', error.message);
+    if (error.code === 'ECONNREFUSED') {
+      throw new Error(`AI model server at ${CUSTOM_LLM_URL} is not reachable. Ensure your fine-tuned model is running.`);
+    }
+    throw error;
+  }
 }

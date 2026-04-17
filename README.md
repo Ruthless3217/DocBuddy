@@ -28,33 +28,45 @@ DocBuddy AI is a premium, full-stack healthcare platform designed to bridge the 
 | **Backend** | Node.js, Express, MongoDB, Mongoose |
 | **Frontend** | React, Vite, TailwindCSS, Framer Motion |
 | **Authentication** | JWT, bcryptjs |
-| **AI Integration** | Google Gemini SDK / Custom LLM Services |
+### 2. AI Assistant (Fine-Tuning)
+- **Model Support**: Fully integrated for local fine-tuned models (Llama-3, Mistral).
+- **Custom Integration**: To use your own model, update `AI_PROVIDER=custom` in `backend/.env`.
+- **Connectivity**: Use `node backend/src/scripts/test-ai.js` to verify your model endpoint.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology |
+|---|---|
+| **Backend** | Node.js, Express, MongoDB, Mongoose |
+| **Frontend** | React, Vite, TailwindCSS, Framer Motion |
+| **Authentication** | JWT, bcryptjs |
+| **AI Integration** | Google Gemini / Custom Fine-Tuned (Llama-3) |
 | **State Mgmt** | React Query, Context API |
-| **UI/Icons** | Lucide React, Glassmorphism CSS |
 
 ---
 
 ## 📦 Getting Started
 
-### 1. Backend Setup
+### 1. Fast Start (Root)
 ```bash
-cd backend
-npm install
-# Create .env based on .env.example
 npm run dev
 ```
 
-### 2. Frontend Setup
+### 2. Manual Setup
 ```bash
-cd frontend
-npm install
-npm run dev
+# Backend
+cd backend && npm install && npm run dev
+
+# Frontend
+cd frontend && npm install && npm run dev
 ```
 
-### 3. Database Seeding (Optional)
+### 3. Database Seeding & Tests
 ```bash
-cd backend
-node src/scripts/seed.js
+npm run seed
+node backend/src/scripts/test-ai.js
 ```
 
 ---

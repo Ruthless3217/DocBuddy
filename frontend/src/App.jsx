@@ -8,6 +8,8 @@ const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Login = lazy(() => import('./pages/Auth/Login'));
 const Register = lazy(() => import('./pages/Auth/Register'));
 const PatientDashboard = lazy(() => import('./pages/PatientDashboard'));
+const DoctorDashboard = lazy(() => import('./pages/DoctorDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AIChat = lazy(() => import('./pages/AIChatInterface'));
 const DoctorDiscovery = lazy(() => import('./pages/DoctorList'));
 const Queries = lazy(() => import('./pages/QueryList'));
@@ -22,13 +24,21 @@ const PageLoader = () => (
   </div>
 );
 
-// Protected Route Shield
+// Dashboard path per role
+const ROLE_DASHBOARD = { patient: '/dashboard', doctor: '/doctor/dashboard', admin: '/admin/dashboard' };
+
+// Protected Route Shield — redirects to role's own dashboard if wrong role
 const ProtectedRoute = ({ children, role }) => {
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   
   if (!token) return <Navigate to="/login" replace />;
-  if (role && user.role !== role) return <Navigate to="/" replace />;
+  
+  if (role && user.role !== role) {
+    // Send them to their own role's dashboard rather than home
+    const ownDashboard = ROLE_DASHBOARD[user.role] || '/';
+    return <Navigate to={ownDashboard} replace />;
+  }
   
   return children;
 };
@@ -60,6 +70,20 @@ export default function App() {
             <Route path="/ai-chat" element={
               <ProtectedRoute role="patient">
                 <AIChat />
+              </ProtectedRoute>
+            } />
+
+            {/* Protected Doctor Routes */}
+            <Route path="/doctor/dashboard" element={
+              <ProtectedRoute role="doctor">
+                <DoctorDashboard />
+              </ProtectedRoute>
+            } />
+
+            {/* Protected Admin Routes */}
+            <Route path="/admin/dashboard" element={
+              <ProtectedRoute role="admin">
+                <AdminDashboard />
               </ProtectedRoute>
             } />
 

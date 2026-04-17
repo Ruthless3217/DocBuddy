@@ -15,9 +15,16 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await authService.login(email, password);
+      const { user } = await authService.login(email, password);
       toast.success('Welcome back to DocBuddy AI!');
-      navigate('/dashboard');
+      
+      const roleDashboard = {
+        admin: '/admin/dashboard',
+        doctor: '/doctor/dashboard',
+        patient: '/dashboard'
+      };
+      
+      navigate(roleDashboard[user.role] || '/');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Invalid credentials');
     } finally {
